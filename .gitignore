@@ -1,0 +1,20 @@
+*.csv
+*.chkpt
+*.pyc
+*.json
+*.bin
+*.pkl
+*.pt
+*.pdf
+*.h5
+*.txt
+*test.py
+*.sh
+*.npy
+*.zip
+*.out
+*.model
+* __pycache__
+/log/
+/data/pretrain_bert_model/
+/result/

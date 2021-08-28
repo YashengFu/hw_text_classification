@@ -2,6 +2,7 @@ import os
 import random
 import numpy as np
 import json
+import time
 import transformers as tfs
 import torch
 from torch import nn
@@ -10,6 +11,8 @@ from model import create_model
 import argparse
 import pandas as pd
 import matplotlib.pyplot as plt
+from sklearn.feature_extraction.text import CountVectorizer
+from utils.split_data import load_data
 
 softmax = nn.Softmax(dim=1)
 # 获取一个epoch需要的batch数
@@ -82,15 +85,17 @@ def build_label_set_and_sample_num(input_path, output_path):
         return record["label_list"], record["total_num"]
 
 def main():
+    start_time = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument('--positive_train_file_path',default= "../data/game_data/postive_train.json")
     parser.add_argument('--unlabeled_train_file_path',default= '../data/game_data/unlabeled_train.json')
     parser.add_argument('--pretrained_bert_path',default= './data/pretrain_bert_model/bert-base-chinese')
     parser.add_argument('--finetuned_model_path',default= '../model/baseline/model_epoch2.pkl')
-    parser.add_argument('--pu_data_text_save_path',default= '../data/game_data/PU_text.npy')
-    parser.add_argument('--pu_data_label_save_path',default= '../data/game_data/PU_label.npy')
+    parser.add_argument('--pu_data_text_save_path',default= '../data/game_data/PU_text_test.npy')
+    parser.add_argument('--pu_data_label_save_path',default= '../data/game_data/PU_label_test.npy')
     args = parser.parse_args()
     print(args)
+    '''
     STOP = False
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -102,7 +107,40 @@ def main():
     #set the batchsize to 1 here
     pos_data_iter = get_bert_iterator_batch(args.positive_train_file_path, batch_size=1)
     unlabeled_data_iter = get_bert_iterator_batch(args.unlabeled_train_file_path, batch_size=1*2)
+    '''
 
+    ###############################add  vector
+    P_data = load_data(args.positive_train_file_path)
+    U_data = load_data(args.unlabeled_train_file_path)
+
+    P_content =[]
+    U_content =[]
+    for item in tqdm(P_data):
+        article = item["title"]+item["body"]
+        P_content.append(article)
+    for item in tqdm(U_data[0:2*len(P_data)]):
+        article = item["title"]+item["body"]
+        U_content.append(article)
+ 
+
+    #vectorizer_P = CountVectorizer(binary=False,ngram_range=(2,5),analyzer='char',max_features=10)
+    vectorizer_U = CountVectorizer(binary=False,ngram_range=(2,5),analyzer='char',max_features=10)
+    #vectorizer_P.fit(P_content) # 生成词汇表
+    vectorizer_U.fit(U_content) # 生成词汇表
+    #vocabulary = vectorizer.vocabulary_ # 输出词汇表
+    #print(vocabulary)
+    vector_P = vectorizer_U.transform(P_content).toarray() # 生成向量
+    vector_U = vectorizer_U.transform(U_content).toarray() # 生成向量
+    label = [1 for i in range(len(vector_P))]+[0 for i in range(len(vector_U))]
+    X_v = np.vstack((vector_P,vector_U))
+    y_v = np.array(label)
+
+    np.save(args.pu_data_text_save_path, X_v)
+    np.save(args.pu_data_label_save_path, y_v)
+    print("PU data build successfully...")
+    print("total build pu data time is: ", (time.time()-start_time)/60)
+#######################################################################################################
+    '''
     # load model here
     model = create_model(
             setting.model_name,
@@ -124,7 +162,9 @@ def main():
         RN_label = []
         for pos_batch,unlabeled_batch in tqdm(zip(pos_data_iter,unlabeled_data_iter)):
             encoded_unlabeled = model.encode(unlabeled_batch)
+            print("~~~~~~~~")
             encoded_unlabeled = encoded_unlabeled.cpu().numpy().tolist()
+
 
             X += encoded_unlabeled
             y += [0 for i in range(len(encoded_unlabeled))]
@@ -139,6 +179,7 @@ def main():
     np.save(args.pu_data_text_save_path, X)
     np.save(args.pu_data_label_save_path, y)
     print("PU data build successfully...")
-
+    print("total build pu data time is: ", (time.time()-start_time)/60)
+    '''
 if __name__ == "__main__":
     main()

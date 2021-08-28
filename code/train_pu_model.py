@@ -1,5 +1,5 @@
 import numpy as np
-import os
+import time
 import joblib
 from sklearn.ensemble import RandomForestClassifier,GradientBoostingClassifier
 from sklearn.tree import DecisionTreeClassifier
@@ -87,32 +87,53 @@ class ElkanotoPuClassifier(BaseEstimator, ClassifierMixin):
 
 def train_pu_model():
 
+    start_time = time.time()
+
     parser = argparse.ArgumentParser()
     parser.add_argument('--pu_data_text_save_path',default= '../data/game_data/PU_text.npy')
     parser.add_argument('--pu_data_label_save_path',default= '../data/game_data/PU_label.npy')
     parser.add_argument('--pu_model_save_path',default= '../model/baseline/pu_model.bin')
     parser.add_argument('--hold_out_ratio',default= 0.1,type=float)
     parser.add_argument('--threshold',default= 0.72,type=float)
+    
+    parser.add_argument('--valid_P_prob_save_path',default= '../data/game_data/P_prob.npy')
+    parser.add_argument('--valid_U_prob_save_path',default= '../data/game_data/U_prob.npy')
+    
     args = parser.parse_args()
     print(args)
 
     print("\nStart fitting...")
-    estimator = RandomForestClassifier(
-        n_estimators=100,
-        criterion='gini',
-        bootstrap=True,
-        n_jobs=8
-    )
+    #estimator = RandomForestClassifier(
+    #    n_estimators=100,
+    #    criterion='gini',
+    #    bootstrap=True,
+    #    n_jobs=8
+    #)
     #estimator = BaggingClassifierPU(
     #    DecisionTreeClassifier(),
     #    n_estimators = 100,  # 1000 trees as usual
     #    max_samples = 0.05, # Balance the positives and unlabeled in each bag
     #    n_jobs = 8           # Use all cores
     #)
+    ###
+    from lightgbm import LGBMClassifier
+    estimator = LGBMClassifier(
+        learning_rate=0.05,
+        n_estimators=1000,
+        num_leaves=255,
+        subsample=0.8,
+        colsample_bytree=1,
+        random_state=2021,
+        metric='None',
+        n_jobs=8
+    )
     pu_classifier = ElkanotoPuClassifier(estimator, hold_out_ratio=args.hold_out_ratio)
 
     X = np.load(args.pu_data_text_save_path)
     y = np.load(args.pu_data_label_save_path)
+
+    #X = X[0:200]
+    #y = y[0:200]
 
     n_postive = (y == 1).sum()
     n_unlabeled = (y == 0).sum()
@@ -129,6 +150,7 @@ def train_pu_model():
 
     X_unlabel = X[y == 0]
     print("len of X_unlabeled: ", X_unlabel.shape)
+    
     pos_train_prob,pos_valid_prob,unlabel_train_prob,unlabel_valid_prob = pu_classifier.fit(X_positive, X_unlabel)
     #plt.hist(pos_train_prob,bins=100,histtype="step",label="Pos Train")
     plt.hist(pos_valid_prob,bins=100,histtype="step",label="Pos Valid")
@@ -139,5 +161,12 @@ def train_pu_model():
     joblib.dump(pu_classifier, args.pu_model_save_path)
     print("Fitting done!")
 
+    P = np.array(pos_valid_prob)
+    U = np.array(unlabel_valid_prob)
+    np.save(args.valid_P_prob_save_path, P)
+    np.save(args.valid_U_prob_save_path, U)
+
+    print("PU data build successfully...")
+    print("total time is: ", (time.time()-start_time)/60)
 if __name__ == "__main__":
     train_pu_model()

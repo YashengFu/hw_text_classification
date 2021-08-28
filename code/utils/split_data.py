@@ -1,33 +1,30 @@
 from tqdm import tqdm
 import json
+import ast
 import numpy as np
 
 def load_data(input_path,num=-1):
     """load data into a list
     """
-    datas = []
-    with open(input_path, 'r', encoding="utf-8") as input_file:
-        lines = input_file.readlines()
-        if num > 0 :
-            lines = lines[:num]
-        for line in tqdm(lines):
-            json_data = json.loads(line)
-            datas.append(json_data)
-        del lines
-    return datas
+    data = []
+    datas = open(input_path)
+    #with open(input_path, 'r', encoding="utf-8") as input_file:
+    #    lines = input_file.readlines()
+    #    if num > 0 :
+    #        lines = lines[:num]
+    for line in tqdm(datas):
+        json_data = ast.literal_eval(line)
+        data.append(json_data)
+    return data
 
 def split_data(input_path,folds=5,kfold=1,num=-1):
     """load data and divide it into training set and test set
     """
     data = []
-    with open(input_path, 'r', encoding="utf-8") as input_file:
-        lines = input_file.readlines()
-        if num > 0 :
-            lines = lines[:num]
-        for line in tqdm(lines):
-            json_data = json.loads(line)
-            data.append(json_data)
-        del lines
+    datas = open(input_path)
+    for line in tqdm(datas):
+        json_data = ast.literal_eval(line)
+        data.append(json_data)
 
     all_ids = [i for i in range(len(data))]
     np.random.shuffle(all_ids)

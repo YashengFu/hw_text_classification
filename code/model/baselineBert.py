@@ -28,7 +28,6 @@ class BaselineBertModel(nn.Module):
         self.fc = nn.Sequential(
             nn.Dropout(p=self.config.dropout),
             nn.Linear(self.config.hidden_size, self.config.num_class),
-            nn.Sigmoid()
         )
 
     def forward(self, batch_sentences):

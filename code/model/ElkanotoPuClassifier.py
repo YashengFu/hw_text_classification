@@ -56,7 +56,7 @@ class ElkanotoPuClassifier(BaseEstimator, ClassifierMixin):
         probabilistic_predictions = probabilistic_predictions[:, 1]
         return probabilistic_predictions / self.c
 
-    def predict(self, X, threshold=0.7):
+    def predict(self, X, threshold=0.33):
         if not self.estimator_fitted:
             raise NotFittedError(
                 'The estimator must be fitted before calling predict(...).'

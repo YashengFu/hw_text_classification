@@ -13,6 +13,7 @@ from model import create_model
 import argparse
 from model.ElkanotoPuClassifier import ElkanotoPuClassifier
 softmax = nn.Softmax(dim=1)
+import time
 
 def predict_with_pu(text, pu_classifier, bert_classifier_model):
 
@@ -45,8 +46,11 @@ def summary(test_data_iter,output_path, pu_classifier,bert_classifier_model):
         info["predict_doctype"].append(predicted_label)
     info_df = pd.DataFrame(info)
     info_df.to_csv(output_path,index=None)
+    print("---------------The distribution of predictions- --------")
+    print(info_df["predict_doctype"].value_counts())
 
 def joint_predictor():
+    start_time = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument('--pretrained_bert_path',default= './data/prtrain_bert_model/bert-base-chinese')
     parser.add_argument('--finetuned_model_path',default= '../model/baseline/model_epoch2.pkl')
@@ -63,7 +67,7 @@ def joint_predictor():
     model = create_model(
             setting.model_name,
             pretrained_model = setting.pretrain_path,
-            dropout = setting.dropout,
+            dropout = setting.dropout, 
             embed_dim = setting.embed_dim,
             hidden_size = setting.hidden_size,
             device = device
@@ -77,7 +81,8 @@ def joint_predictor():
     test_dataset = create_dataset(
             setting.model_name,test_data,
             cut_len = setting.cut_length,
-            mode = "test"
+            mode = "test",
+            n_aug = 0
             )
     print("Lodal data : %s"%(args.preprocessed_test_file_path))
 
@@ -87,6 +92,6 @@ def joint_predictor():
         pu_classifier = joblib.load(args.pu_model_save_path)
         summary(test_dataset,args.output,pu_classifier,model)
     print("Evaluation done! Result has saved to: ", args.output)
-
+    print((time.time()-start_time)/60)
 if __name__ == "__main__":
     joint_predictor()

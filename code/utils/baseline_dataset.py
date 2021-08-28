@@ -31,7 +31,6 @@ class BaselineDataset(data.Dataset):
         """
         Data Enhancement,Synonym substitution
         """
-        #smw = Similarword(create_num=1, change_rate=0.2)
         if self.n_aug != 0:
             for i in range(len(self.datas)):
                 if self.n_aug >1:
@@ -41,8 +40,8 @@ class BaselineDataset(data.Dataset):
                 for j in range(true_aug):
                     #Synonym substitution
                     enhance_item = self.datas[i]
-                    #enhance_item['body'] = smw.replace(self.datas[i]['body'])
-                    res = jio.swap_char_position(enhance_item["body"],augmentation_num=1)
+                    res = jio.random_add_delete(enhance_item["body"],augmentation_num=1)
+                    # res = jio.swap_char_position(enhance_item["body"],augmentation_num=1)
                     #res = jio.homophone_substitution(enhance_item["body"],augmentation_num=1)
                     if res == []:
                         break
@@ -92,7 +91,7 @@ def test():
         print(idx)
         print(text)
         print(label)
-        break
+        #break
 
 if __name__ == "__main__":
     test()

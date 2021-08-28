@@ -1,4 +1,5 @@
 import numpy as np
+import time
 import random
 import argparse
 import pandas as pd
@@ -17,6 +18,7 @@ import pickle
 
 def main():
 
+    start_time = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int,default=77)
     # parameter of train
@@ -25,8 +27,8 @@ def main():
     parser.add_argument('--epoch', type=int,default=2)
     parser.add_argument('--kfold', type=int,default=1)
     parser.add_argument('--folds', type=int,default=5)
-    parser.add_argument('--output_train_info',default="../model/train_info.pkl")
-    parser.add_argument('--output_model',default="../model/model_epoch%d.pkl")
+    parser.add_argument('--output_train_info',default="../model/softmax_base/train_info.pkl")
+    parser.add_argument('--output_model',default="../model/softmax_base/model_epoch%d.pkl")
     parser.add_argument('--input',default="../data/game_data/postive_train.json")
     parser.add_argument('--save_start_epoch', type=int,default=1)
     parser.add_argument('--save_per_epoch', type=int,default=1)
@@ -34,10 +36,12 @@ def main():
     parser.add_argument('--scheduler', action="store_true")
     # parameter of model
     parser.add_argument('--cut_length',default=512,type=int)
+    parser.add_argument('--n_aug',default=0,type=int)
     #parser.add_argument('--pretrain_path',default="../data/pretrain_bert_model/google-bert-chinese/chinese_L-12_H-768_A-12")
     parser.add_argument('--pretrain_path',default="../data/pretrain_bert_model/bert-base-chinese")
     parser.add_argument('--embed_dim',default=300,type=int)
     parser.add_argument('--hidden_size',default=768,type=int)
+    parser.add_argument('--num_class',default=10,type=int)
     parser.add_argument('--model_name', default="baseline")
     parser.add_argument('--dropout', type=float, default=0.2)
     args = parser.parse_args()
@@ -58,22 +62,23 @@ def main():
     train_dataset = create_dataset(
             args.model_name,train_data,
             cut_len = args.cut_length,
-            n_aug = 1
+            n_aug = args.n_aug
             )
     valid_dataset = create_dataset(
             args.model_name,valid_data,
             cut_len = args.cut_length,
             n_aug = 0
             )
-    
+
     print('Data has been loaded successfully!')
     print('Train Data Samples :%d , Valid Data Samples :%d'%(len(train_dataset),len(valid_dataset)))
 
-    
+
     model = create_model(args.model_name,
             pretrained_model = args.pretrain_path,
             dropout = args.dropout,
             hidden_size = args.hidden_size,
+            num_class = args.num_class,
             device = device
             )
     print('Create model successfully!')
@@ -98,7 +103,7 @@ def main():
         scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer,T_0=3,T_mult=2,eta_min=args.lr/10,last_epoch=-1)
     else:
         scheduler = None
-    
+
     trainloader = train_dataset.create_data_loader(batch_size = args.batch_size,shuffle=True)
     validloader = valid_dataset.create_data_loader(batch_size = args.batch_size,shuffle=True)
     train_dataset_len = len(train_dataset)
@@ -148,7 +153,7 @@ def main():
             valid_idx += idx
             valid_loss = cross_entropy(outputs, valid_y.to(device))
             valid_losses.append(valid_loss.item())
-        
+
         train_info["valid_info"]["epoch_%d"%(epoch + 1)] = {"idx":valid_idx,
                 "true_labels":true_labels,"pred_labels":pred_labels}
         train_info["valid_macro_f1"].append(f1_score(true_labels,pred_labels,average="macro"))
@@ -181,6 +186,6 @@ def main():
             best_epoch_info["valid_loss"] = mean_valid_loss
             best_epoch_info["model_path"] = args.output_model%(epoch + 1)
     print('End training')
-
+    print("total time is: ", (time.time()-start_time))
 if __name__ == "__main__":
     main()

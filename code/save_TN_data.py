@@ -1,3 +1,10 @@
+"""
+    train a neural network for text classification
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    :author Yasheng Fu(付亚圣)
+    :copyright:@ 2021 Yasheng Fu <fuyasheng321@163.com>
+"""
+
 import torch
 import ast
 import time
@@ -19,7 +26,6 @@ softmax = nn.Softmax(dim=1)
 def predict_with_pu(text, pu_classifier, bert_classifier_model):
 
     encoded_pos = np.array(bert_classifier_model.encode([text]).tolist())
-    # 先使用 PU 预测是否为 "其他"
     pu_result = pu_classifier.predict_proba(encoded_pos)
 
     return pu_result
@@ -29,7 +35,6 @@ def prepare_sequence(title: str, body: str):
     return (title, body[:half_len] + "|" + body[-half_len:])
 
 
-# 结构化输出模型在测试集上的结果
 def summary(test_data,output_path, pu_classifier,bert_classifier_model):
     filtered_file = open(output_path,"w")
     i=0
@@ -46,13 +51,13 @@ def summary(test_data,output_path, pu_classifier,bert_classifier_model):
         i+=1
         if i==100:
             print(time.time())
-        
+
 
     filtered_file.close()
 
 
     #info = {"id":[],"predict_doctype":[]}
-    
+
 
 def save_TN():
     start_time = time.time()
@@ -61,7 +66,7 @@ def save_TN():
     parser.add_argument('--finetuned_model_path',default= '../model/data_enhance/model_epoch2.pkl')
     parser.add_argument('--pu_model_save_path',default= '../model/data_enhance/pu_model.bin')
     parser.add_argument('--unlabeled_train_file_path',default= "../data/game_data/unlabeled_train.json")
-    parser.add_argument('--output',default= "../data/game_data/asaass_score_unlabeled_train.json")
+    parser.add_argument('--output',default= "../data/game_data/score_unlabeled_train.json")
     args = parser.parse_args()
     print(args)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -72,7 +77,7 @@ def save_TN():
     model = create_model(
             setting.model_name,
             pretrained_model = setting.pretrain_path,
-            dropout = setting.dropout, 
+            dropout = setting.dropout,
             embed_dim = setting.embed_dim,
             hidden_size = setting.hidden_size,
             device = device
@@ -81,14 +86,12 @@ def save_TN():
     model.to(device)
     model.eval()
     print("Lodal model : %s"%(args.finetuned_model_path))
-    #load test data here
-    
+
     test_data = open(args.unlabeled_train_file_path)
     print("Lodal data : %s"%(args.unlabeled_train_file_path))
 
 
     with torch.no_grad():
-        # 读取 PU 模型
         pu_classifier = joblib.load(args.pu_model_save_path)
         summary(test_data,args.output,pu_classifier,model)
     print("Evaluation done! Result has saved to: ", args.output)

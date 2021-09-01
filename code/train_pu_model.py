@@ -10,7 +10,6 @@ import matplotlib
 matplotlib.use('AGG')
 import matplotlib.pyplot as plt
 from sklearn.svm import SVC
-#from utils.baggingPU import BaggingClassifierPU
 
 class ElkanotoPuClassifier(BaseEstimator, ClassifierMixin):
     def __init__(self, estimator, hold_out_ratio=0.1, threshold=0.7):
@@ -38,7 +37,7 @@ class ElkanotoPuClassifier(BaseEstimator, ClassifierMixin):
         return hold_out_part, rest_part
 
     def fit(self, pos, unlabeled):
-        # 打乱 pos 数据集, 按比例划分 hold_out 部分和非 hold_out 部分
+        # shuffle the pos data and divide the hold_out part and the non_hold_out part proportionally
         pos_hold_out, pos_rest = self.split_hold_out(pos)
         pos_hold_out, valid_pos_hold_out = self.split_hold_out(pos_hold_out)
         unlabeled_hold_out, unlabeled_rest = self.split_hold_out(unlabeled)
@@ -95,69 +94,53 @@ def train_pu_model():
     parser.add_argument('--pu_model_save_path',default= '../model/baseline/pu_model.bin')
     parser.add_argument('--hold_out_ratio',default= 0.1,type=float)
     parser.add_argument('--threshold',default= 0.72,type=float)
-    
+    parser.add_argument('--classifier_type',default= 'LGBM',type=str,choices=['random_forest','LGBM'])
+
     parser.add_argument('--valid_P_prob_save_path',default= '../data/game_data/P_prob.npy')
     parser.add_argument('--valid_U_prob_save_path',default= '../data/game_data/U_prob.npy')
-    
+
     args = parser.parse_args()
     print(args)
 
     print("\nStart fitting...")
-    #estimator = RandomForestClassifier(
-    #    n_estimators=100,
-    #    criterion='gini',
-    #    bootstrap=True,
-    #    n_jobs=8
-    #)
-    #estimator = BaggingClassifierPU(
-    #    DecisionTreeClassifier(),
-    #    n_estimators = 100,  # 1000 trees as usual
-    #    max_samples = 0.05, # Balance the positives and unlabeled in each bag
-    #    n_jobs = 8           # Use all cores
-    #)
-    ###
-    from lightgbm import LGBMClassifier
-    estimator = LGBMClassifier(
-        learning_rate=0.05,
-        n_estimators=1000,
-        num_leaves=255,
-        subsample=0.8,
-        colsample_bytree=1,
-        random_state=2021,
-        metric='None',
-        n_jobs=8
-    )
+    if args.classifier_type == 'random_forest':
+        estimator = RandomForestClassifier(
+            n_estimators=100,
+            criterion='gini',
+            bootstrap=True,
+            n_jobs=8
+        )
+    elif args.classifier_type == 'LGBM':
+        from lightgbm import LGBMClassifier
+        estimator = LGBMClassifier(
+            learning_rate=0.05,
+            n_estimators=1000,
+            num_leaves=255,
+            subsample=0.8,
+            colsample_bytree=1,
+            random_state=2021,
+            metric='None',
+            n_jobs=8
+        )
     pu_classifier = ElkanotoPuClassifier(estimator, hold_out_ratio=args.hold_out_ratio)
 
     X = np.load(args.pu_data_text_save_path)
     y = np.load(args.pu_data_label_save_path)
 
-    #X = X[0:200]
-    #y = y[0:200]
-
     n_postive = (y == 1).sum()
     n_unlabeled = (y == 0).sum()
     print("total n_positive: ", n_postive)
     print("total n_unlabel:  ", n_unlabeled)
-    # 随机筛选正样本和负样本
-    # positive_random_index = np.random.choice(n_postive, RANDOM_POSITIVE_NUM)
-    # unlabeled_random_index = np.random.choice(n_unlabeled, RANDOM_NEGATIVE_NUM)
-    y_unlabel = np.ones(n_unlabeled)
-
     X_positive = X[y == 1]
     print("len of X_positive: ", X_positive.shape)
-    y_positive_train = np.ones(n_postive)
-
     X_unlabel = X[y == 0]
     print("len of X_unlabeled: ", X_unlabel.shape)
-    
+
     pos_train_prob,pos_valid_prob,unlabel_train_prob,unlabel_valid_prob = pu_classifier.fit(X_positive, X_unlabel)
-    #plt.hist(pos_train_prob,bins=100,histtype="step",label="Pos Train")
     plt.hist(pos_valid_prob,bins=100,histtype="step",label="Pos Valid")
     plt.hist(unlabel_valid_prob,bins=100,label="Unlabel Valid")
-    #plt.hist(unlabel_train_prob,bins=100,label="Unlabel Train")
     plt.legend()
-    plt.savefig('posVSunlabel.pdf')
+    plt.savefig('./script/plots/P_U-valid.pdf')
     joblib.dump(pu_classifier, args.pu_model_save_path)
     print("Fitting done!")
 

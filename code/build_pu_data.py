@@ -9,18 +9,16 @@ from torch import nn
 from tqdm import tqdm
 from model import create_model
 import argparse
-import pandas as pd
-import matplotlib.pyplot as plt
 from sklearn.feature_extraction.text import CountVectorizer
 from utils.split_data import load_data
 
 softmax = nn.Softmax(dim=1)
-# 获取一个epoch需要的batch数
+# get the  number of batches required for an epoch
 def get_steps_per_epoch(line_count, batch_size):
     return line_count // batch_size if line_count % batch_size == 0 else line_count // batch_size + 1
 
 
-# 获取数据集的标签集及其大小
+# Get label set size of the data set
 def get_label_set_and_sample_num(config_path, sample_num=False):
     with open(config_path, "r", encoding="UTF-8") as input_file:
         json_data = json.loads(input_file.readline())
@@ -29,13 +27,12 @@ def get_label_set_and_sample_num(config_path, sample_num=False):
         else:
             return json_data["label_list"]
 
-# 定义输入到Bert中的文本的格式,即标题,正文,source的组织形式
+# Define the format of the text entered into Bert, that is, the title, body, and source organization
 def prepare_sequence(title: str, body: str):
     half_len = (512 - len(title) - 4) // 2
     return (title, body[:half_len] + "|" + body[-half_len:])
 
-
-# 迭代器: 逐条读取数据并输出文本和标签
+# Iterator: Read data one by one and output text and labels
 def get_text_and_label_index_iterator(input_path):
     with open(input_path, 'r', encoding="utf-8") as input_file:
         for line in input_file:
@@ -44,7 +41,7 @@ def get_text_and_label_index_iterator(input_path):
             yield text
 
 
-# 迭代器: 生成一个batch的数据
+# Iterator: Generate a batch of data
 def get_bert_iterator_batch(data_path, batch_size=32):
     keras_bert_iter = get_text_and_label_index_iterator(data_path)
     continue_iterator = True
@@ -88,14 +85,14 @@ def main():
     start_time = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument('--positive_train_file_path',default= "../data/game_data/postive_train.json")
+    #parser.add_argument('--unlabeled_train_file_path',default= '../data/game_data/LGMBselected_score_unlabeled_train.json')
     parser.add_argument('--unlabeled_train_file_path',default= '../data/game_data/unlabeled_train.json')
     parser.add_argument('--pretrained_bert_path',default= './data/pretrain_bert_model/bert-base-chinese')
-    parser.add_argument('--finetuned_model_path',default= '../model/baseline/model_epoch2.pkl')
+    parser.add_argument('--finetuned_model_path',default= '../model/baseline/baseline_liner_model_epoch2.pkl')
     parser.add_argument('--pu_data_text_save_path',default= '../data/game_data/PU_text_test.npy')
     parser.add_argument('--pu_data_label_save_path',default= '../data/game_data/PU_label_test.npy')
     args = parser.parse_args()
     print(args)
-    '''
     STOP = False
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -107,40 +104,36 @@ def main():
     #set the batchsize to 1 here
     pos_data_iter = get_bert_iterator_batch(args.positive_train_file_path, batch_size=1)
     unlabeled_data_iter = get_bert_iterator_batch(args.unlabeled_train_file_path, batch_size=1*2)
-    '''
 
-    ###############################add  vector
-    P_data = load_data(args.positive_train_file_path)
-    U_data = load_data(args.unlabeled_train_file_path)
+    representation_features = False
+    if representation_features:
+        P_data = load_data(args.positive_train_file_path)
+        U_data = load_data(args.unlabeled_train_file_path)
 
-    P_content =[]
-    U_content =[]
-    for item in tqdm(P_data):
-        article = item["title"]+item["body"]
-        P_content.append(article)
-    for item in tqdm(U_data[0:2*len(P_data)]):
-        article = item["title"]+item["body"]
-        U_content.append(article)
- 
+        P_content =[]
+        U_content =[]
+        for item in tqdm(P_data):
+            article = item["title"]+item["body"]
+            P_content.append(article)
+        for item in tqdm(U_data[0:2*len(P_data)]):
+            article = item["title"]+item["body"]
+            U_content.append(article)
+        
+        # only use unlabeled data for feature representation
+        vectorizer_U = CountVectorizer(binary=False,ngram_range=(2,5),analyzer='char',max_features=10)
+        vectorizer_U.fit(U_content) # generate vocabulary
 
-    #vectorizer_P = CountVectorizer(binary=False,ngram_range=(2,5),analyzer='char',max_features=10)
-    vectorizer_U = CountVectorizer(binary=False,ngram_range=(2,5),analyzer='char',max_features=10)
-    #vectorizer_P.fit(P_content) # 生成词汇表
-    vectorizer_U.fit(U_content) # 生成词汇表
-    #vocabulary = vectorizer.vocabulary_ # 输出词汇表
-    #print(vocabulary)
-    vector_P = vectorizer_U.transform(P_content).toarray() # 生成向量
-    vector_U = vectorizer_U.transform(U_content).toarray() # 生成向量
-    label = [1 for i in range(len(vector_P))]+[0 for i in range(len(vector_U))]
-    X_v = np.vstack((vector_P,vector_U))
-    y_v = np.array(label)
+        vector_P = vectorizer_U.transform(P_content).toarray() 
+        vector_U = vectorizer_U.transform(U_content).toarray() 
+        label = [1 for i in range(len(vector_P))]+[0 for i in range(len(vector_U))]
+        X_v = np.vstack((vector_P,vector_U))
+        y_v = np.array(label)
+    
+        np.save(args.pu_data_text_save_path, X_v)
+        np.save(args.pu_data_label_save_path, y_v)
+        print("Representation of features successfully...")
+        print("total representation time is: ", (time.time()-start_time)/60)
 
-    np.save(args.pu_data_text_save_path, X_v)
-    np.save(args.pu_data_label_save_path, y_v)
-    print("PU data build successfully...")
-    print("total build pu data time is: ", (time.time()-start_time)/60)
-#######################################################################################################
-    '''
     # load model here
     model = create_model(
             setting.model_name,
@@ -162,7 +155,6 @@ def main():
         RN_label = []
         for pos_batch,unlabeled_batch in tqdm(zip(pos_data_iter,unlabeled_data_iter)):
             encoded_unlabeled = model.encode(unlabeled_batch)
-            print("~~~~~~~~")
             encoded_unlabeled = encoded_unlabeled.cpu().numpy().tolist()
 
 
@@ -180,6 +172,5 @@ def main():
     np.save(args.pu_data_label_save_path, y)
     print("PU data build successfully...")
     print("total build pu data time is: ", (time.time()-start_time)/60)
-    '''
 if __name__ == "__main__":
     main()

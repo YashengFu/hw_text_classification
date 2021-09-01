@@ -1,3 +1,10 @@
+"""
+    train a neural network for text classification
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    :author Yasheng Fu(付亚圣)
+    :copyright:@ 2021 Yasheng Fu <fuyasheng321@163.com>
+"""
+
 import numpy as np
 import time
 import random
@@ -37,7 +44,6 @@ def main():
     # parameter of model
     parser.add_argument('--cut_length',default=512,type=int)
     parser.add_argument('--n_aug',default=0,type=int)
-    #parser.add_argument('--pretrain_path',default="../data/pretrain_bert_model/google-bert-chinese/chinese_L-12_H-768_A-12")
     parser.add_argument('--pretrain_path',default="../data/pretrain_bert_model/bert-base-chinese")
     parser.add_argument('--embed_dim',default=300,type=int)
     parser.add_argument('--hidden_size',default=768,type=int)
